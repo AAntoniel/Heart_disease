@@ -1,5 +1,4 @@
 # %%
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,7 +18,11 @@ import os
 
 
 def read_files(file_name: str):
-    df = pd.read_csv(f"Data/database/{file_name}", header=None, na_values="?")
+    df = pd.read_csv(
+        f"Data/database/{file_name}",
+        header=None,
+        na_values="?",
+    )
 
     return df
 
@@ -51,6 +54,96 @@ df_full.columns = [
 
 df_full
 
+# df_full[df_full["restbps"].isna()].index.tolist()
+# %%
+
+# Data pre-processing
+
+# Solving target column first
+df_full["heart_disease"] = df_full["heart_disease"].apply(lambda x: 1 if x > 0 else 0)
+
+df_full["heart_disease"].value_counts()
+
+# Verifying 0s
+print((df_full == 0).sum())
+
+# %%
+
+# Starting by replacing non-sense 0s by NaNs
+df_full["chol"] = df_full["chol"].replace(0, np.nan)
+df_full["restbps"] = df_full["restbps"].replace(0, np.nan)
+
+print(df_full.isna().sum())
+
+# %%
+
+# Summary global
+
+summary = df_full.groupby(by="heart_disease").agg(["mean", "median"]).T
+summary["abs_diff"] = summary[0] - summary[1]
+summary["diff_rel"] = summary[0] / summary[1]
+summary
+
+# %%
+
+# Numerical features preprocessing
+
+# Summary by male
+summary_male = (
+    df_full[df_full["sex"] == 1]
+    .groupby(by="heart_disease")[["restbps", "chol", "max_heart_rate", "oldpeak"]]
+    .agg(["mean", "median"])
+    .T
+)
+summary_male["abs_diff"] = summary_male[0] - summary_male[1]
+summary_male["diff_rel"] = summary_male[0] / summary_male[1]
+summary_male
+
+# %%
+
+# Summary by female
+summary_female = (
+    df_full[df_full["sex"] == 0]
+    .groupby(by="heart_disease")[["restbps", "chol", "max_heart_rate", "oldpeak"]]
+    .agg(["mean", "median"])
+    .T
+)
+summary_female["abs_diff"] = summary_female[0] - summary_female[1]
+summary_female["diff_rel"] = summary_female[0] / summary_female[1]
+summary_female
+
+# %%
+
+# Summary by sex, chest pain type and heart disease
+
+summary_sex_cp = df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[
+    ["restbps", "chol", "max_heart_rate", "oldpeak"]
+].agg(["mean", "median"])
+summary_sex_cp
+
+# %%
+
+# Numerical data imputation
+nums1 = ["restbps", "chol", "max_heart_rate", "oldpeak"]
+
+for i in nums1:
+    df_full[i] = df_full[i].fillna(
+        df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[i].transform(
+            "median"
+        )
+    )
+
+print(df_full.isna().sum())
+# df_full.loc[[393,610,620,623,626,627,633,635,639,641,645,648,654,655,657,665,666,669,674,684,686,691,693,706,707,708,709,710,711,712,716,717,721,726,730,733,734,738,739,741,742,744,746,752,755,756,757,758,760,761,764,765,771,778,782,793,795,799,914]]
+
+# %%
+# Categorical features preprocessing
+
+summary_sex_cp_cat = df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[
+    ["fast_blood_sug", "rest_electcard", "exc_angina", "slope", "n_fl_maj_ves", "thal"]
+].agg(lambda x: x.mode())
+summary_sex_cp_cat
+
 # %%
 
 # sex (1 = male; 0 = female)
@@ -71,82 +164,6 @@ df_full
 #         -- Value 3: downsloping
 # thal: 3 = normal; 6 = fixed defect; 7 = reversable defect
 
-# df_full[df_full["restbps"].isna()].index.tolist()
-
-# Data pre-processing
-
-# Solving target column first
-df_full["heart_disease"] = df_full["heart_disease"].apply(lambda x: 1 if x > 0 else 0)
-
-df_full["heart_disease"].value_counts()
-
-# Verifying 0s
-print((df_full == 0).sum())
-
-# Starting by replacing non-sense 0s by NaNs
-df_full["chol"] = df_full["chol"].replace(0, np.nan)
-df_full["restbps"] = df_full["restbps"].replace(0, np.nan)
-
-print(df_full.isna().sum())
-
-# Summary global
-
-summary = df_full.groupby(by="heart_disease").agg(["mean", "median"]).T
-summary["abs_diff"] = summary[0] - summary[1]
-summary["diff_rel"] = summary[0] / summary[1]
-summary
-
-# Numerical features preprocessing
-
-# Summary by male
-summary_male = (
-    df_full[df_full["sex"] == 1]
-    .groupby(by="heart_disease")[["restbps", "chol", "max_heart_rate", "oldpeak"]]
-    .agg(["mean", "median"])
-    .T
-)
-summary_male["abs_diff"] = summary_male[0] - summary_male[1]
-summary_male["diff_rel"] = summary_male[0] / summary_male[1]
-summary_male
-
-# Summary by female
-summary_female = (
-    df_full[df_full["sex"] == 0]
-    .groupby(by="heart_disease")[["restbps", "chol", "max_heart_rate", "oldpeak"]]
-    .agg(["mean", "median"])
-    .T
-)
-summary_female["abs_diff"] = summary_female[0] - summary_female[1]
-summary_female["diff_rel"] = summary_female[0] / summary_female[1]
-summary_female
-
-# Summary by sex, chest pain type and heart disease
-
-summary_sex_cp = df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[
-    ["restbps", "chol", "max_heart_rate", "oldpeak"]
-].agg(["mean", "median"])
-summary_sex_cp
-
-# Numerical data imputation
-nums1 = ["restbps", "chol", "max_heart_rate", "oldpeak"]
-
-for i in nums1:
-    df_full[i] = df_full[i].fillna(
-        df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[i].transform(
-            "median"
-        )
-    )
-
-print(df_full.isna().sum())
-# df_full.loc[[393,610,620,623,626,627,633,635,639,641,645,648,654,655,657,665,666,669,674,684,686,691,693,706,707,708,709,710,711,712,716,717,721,726,730,733,734,738,739,741,742,744,746,752,755,756,757,758,760,761,764,765,771,778,782,793,795,799,914]]
-
-# Categorical features preprocessing
-
-summary_sex_cp_cat = df_full.groupby(by=["sex", "chest_pain", "heart_disease"])[
-    ["fast_blood_sug", "rest_electcard", "exc_angina", "slope", "n_fl_maj_ves", "thal"]
-].agg(lambda x: x.mode())
-summary_sex_cp_cat
-
 nums2 = [
     "fast_blood_sug",
     "rest_electcard",
@@ -166,12 +183,20 @@ for i in nums2:
 
 print(df_full.isna().sum())
 
+# %%
+
 df_full
+
+df_full["n_fl_maj_ves"].min()
+
+# %%
 
 df_full[df_full.isna().any(axis=1)].index.tolist()
 
 df_full = df_full.dropna(how="any").reset_index(drop=True)
 df_full.isna().sum()
+
+# %%
 
 # Using SEMMA (SAS) approach
 # Sample
@@ -193,15 +218,17 @@ print(f"Overall target rate {y.mean():.4f}")
 print(f"Train target rate {y_train.mean():.4f}")
 print(f"Test target rate {y_test.mean():.4f}")
 
+# %%
+
 # Explore
 
 # feature_importances
-tree = tree.DecisionTreeClassifier(random_state=42)
-tree.fit(X_train, y_train)
+tree_fi = tree.DecisionTreeClassifier(random_state=42)
+tree_fi.fit(X_train, y_train)
 
 # Cumsum to capture the importances
 feature_importances = (
-    pd.Series(tree.feature_importances_, index=X_train.columns)
+    pd.Series(tree_fi.feature_importances_, index=X_train.columns)
     .sort_values(ascending=False)
     .reset_index()
 )
@@ -209,9 +236,25 @@ feature_importances["acum"] = feature_importances[0].cumsum()
 
 feature_importances
 
+# %%
+
 best_features = feature_importances[feature_importances["acum"] < 1]["index"].to_list()
 best_features
 
+#  To make it easier to user, some technical features will be excluded
+remove = [
+    "thal",
+    "n_fl_maj_ves",
+    "oldpeak",
+    "slope",
+    "rest_electcard",
+    "fast_blood_sug",
+]
+
+best_features = [i for i in best_features if i not in remove]
+best_features
+
+# %%
 
 # With the best features, it's possible to continue with the model, or we can modify it, and that's what we are going to do
 
@@ -220,7 +263,7 @@ best_features
 # Discretisation
 
 tree_disc = discretisation.DecisionTreeDiscretiser(
-    variables=["chol", "max_heart_rate", "oldpeak", "restbps", "age"],
+    variables=["chol", "max_heart_rate", "restbps", "age"],
     regression=False,
     bin_output="bin_number",
     cv=3,
@@ -248,6 +291,8 @@ model_pipeline = pipeline.Pipeline(
 )
 
 model_pipeline.fit(X_train[best_features], y_train)
+
+# %%
 
 # Assess
 
@@ -290,4 +335,10 @@ plt.legend(
         f"Treino: {100*auc_train: .2f}",
         f"Teste: {100*auc_test: .2f}",
     ]
+)
+
+# %%
+
+pd.Series({"model": model_pipeline, "features": best_features}).to_pickle(
+    "model_heart_dis.pkl"
 )
